@@ -14,8 +14,8 @@ type DiameterClient struct {
 	handler *diam.ServeMux
 
 	errorCh chan error
-	cerCh   chan *diam.Message
-	dwrCh   chan *diam.Message
+	ceaCh   chan *diam.Message
+	dwaCh   chan *diam.Message
 }
 
 func (d *DiameterClient) ErrorNotify() <-chan error {
@@ -23,11 +23,11 @@ func (d *DiameterClient) ErrorNotify() <-chan error {
 }
 
 func (d *DiameterClient) CERDoneNotify() <-chan *diam.Message {
-	return d.cerCh
+	return d.ceaCh
 }
 
 func (d *DiameterClient) DWRDoneNotify() <-chan *diam.Message {
-	return d.dwrCh
+	return d.dwaCh
 }
 
 func NewClient(address string) *DiameterClient {
@@ -35,8 +35,8 @@ func NewClient(address string) *DiameterClient {
 		URL: address,
 
 		errorCh: make(chan error),
-		cerCh:   make(chan *diam.Message),
-		dwrCh:   make(chan *diam.Message),
+		ceaCh:   make(chan *diam.Message),
+		dwaCh:   make(chan *diam.Message),
 	}
 	client.handler = diam.NewServeMux()
 	client.handler.Handle("CEA", client.HandleCEA())
@@ -87,7 +87,7 @@ func (d *DiameterClient) SendCER() {
 
 func (d *DiameterClient) HandleCEA() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
-		d.cerCh <- m
+		d.ceaCh <- m
 	}
 }
 
@@ -111,6 +111,6 @@ func (d *DiameterClient) SendDWR() {
 
 func (d *DiameterClient) HandleDWA() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
-		d.dwrCh <- m
+		d.dwaCh <- m
 	}
 }
