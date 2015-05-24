@@ -15,6 +15,7 @@ type DiameterClient struct {
 
 	errorCh chan error
 	cerCh   chan *diam.Message
+	dwrCh   chan *diam.Message
 }
 
 func (d *DiameterClient) ErrorNotify() <-chan error {
@@ -25,15 +26,21 @@ func (d *DiameterClient) CERDoneNotify() <-chan *diam.Message {
 	return d.cerCh
 }
 
+func (d *DiameterClient) DWRDoneNotify() <-chan *diam.Message {
+	return d.dwrCh
+}
+
 func NewClient(address string) *DiameterClient {
 	client := &DiameterClient{
 		URL: address,
 
 		errorCh: make(chan error),
 		cerCh:   make(chan *diam.Message),
+		dwrCh:   make(chan *diam.Message),
 	}
 	client.handler = diam.NewServeMux()
 	client.handler.Handle("CEA", client.HandleCEA())
+	client.handler.Handle("DWA", client.HandleDWA())
 
 	return client
 }
@@ -81,5 +88,29 @@ func (d *DiameterClient) SendCER() {
 func (d *DiameterClient) HandleCEA() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
 		d.cerCh <- m
+	}
+}
+
+func (d *DiameterClient) SendDWR() {
+	var (
+		watchdogExchange uint32 = 280
+		OriginHost              = datatype.DiameterIdentity("jenkin13_OMR_TEST01")
+		OriginRealm             = datatype.DiameterIdentity("dtac.co.th")
+	)
+
+	m := diam.NewRequest(watchdogExchange, 0, nil)
+
+	m.NewAVP(avp.OriginHost, avp.Mbit, 0, OriginHost)
+	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, OriginRealm)
+
+	_, err := m.WriteTo(d.conn)
+	if err != nil {
+		d.errorCh <- err
+	}
+}
+
+func (d *DiameterClient) HandleDWA() diam.HandlerFunc {
+	return func(conn diam.Conn, m *diam.Message) {
+		d.dwrCh <- m
 	}
 }

@@ -29,6 +29,7 @@ func NewTestServer() *Server {
 
 	smux := diam.NewServeMux()
 	smux.Handle("CER", testServer.HandleCER())
+	smux.Handle("DWR", testServer.HandleDWR())
 
 	testServer.Server = diamtest.NewServer(smux, nil)
 
@@ -43,7 +44,7 @@ func TestClientRequestCER(t *testing.T) {
 	if err := client.Start(); err != nil {
 		t.Error(err)
 	}
-	
+
 	client.SendCER()
 
 	select {
@@ -69,6 +70,44 @@ func (s *Server) SendCEA(w io.Writer, m *diam.Message) {
 	m.NewAVP(avp.HostIPAddress, avp.Mbit, 0, datatype.Address(net.ParseIP("127.0.0.1")))
 	m.NewAVP(avp.VendorID, avp.Mbit, 0, datatype.Unsigned32(99))
 	m.NewAVP(avp.ProductName, avp.Mbit, 0, datatype.UTF8String("go-diameter"))
+	_, err := m.WriteTo(w)
+	if err != nil {
+		s.errorCh <- err
+	}
+}
+
+func TestClientRequestDWR(t *testing.T) {
+	server := NewTestServer()
+	defer server.Close()
+
+	client := NewClient(server.Address)
+	if err := client.Start(); err != nil {
+		t.Error(err)
+	}
+
+	client.SendDWR()
+
+	select {
+	case err := <-server.ErrorNotify():
+		t.Error(err)
+	case err := <-client.ErrorNotify():
+		t.Error(err)
+	case m := <-client.DWRDoneNotify():
+		fmt.Println(m)
+	}
+}
+
+func (s *Server) HandleDWR() diam.HandlerFunc {
+	return func(conn diam.Conn, m *diam.Message) {
+		answerMessage := m.Answer(diam.Success)
+		s.SendDWA(conn, answerMessage)
+	}
+}
+
+func (s *Server) SendDWA(w io.Writer, m *diam.Message) {
+	m.NewAVP(avp.OriginHost, avp.Mbit, 0, datatype.OctetString("srv"))
+	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, datatype.OctetString("localhost"))
+
 	_, err := m.WriteTo(w)
 	if err != nil {
 		s.errorCh <- err
