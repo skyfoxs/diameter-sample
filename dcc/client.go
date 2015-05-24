@@ -1,6 +1,7 @@
 package dcc
 
 import (
+	"io"
 	"net"
 	"time"
 
@@ -63,6 +64,7 @@ func NewClient(config DiameterConfig) *DiameterClient {
 	client.handler = diam.NewServeMux()
 	client.handler.Handle("CEA", client.HandleCEA())
 	client.handler.Handle("DWA", client.HandleDWA())
+	client.handler.Handle("DWR", client.HandleDWR())
 
 	return client
 }
@@ -135,5 +137,22 @@ func (d *DiameterClient) SendDWR() {
 func (d *DiameterClient) HandleDWA() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
 		d.dwaCh <- m
+	}
+}
+
+func (d *DiameterClient) HandleDWR() diam.HandlerFunc {
+	return func(conn diam.Conn, m *diam.Message) {
+		answerMessage := m.Answer(diam.Success)
+		d.SendDWA(conn, answerMessage)
+	}
+}
+
+func (d *DiameterClient) SendDWA(w io.Writer, m *diam.Message) {
+	m.NewAVP(avp.OriginHost, avp.Mbit, 0, d.config.OriginHost)
+	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, d.config.OriginRealm)
+	_, err := m.WriteTo(w)
+
+	if err != nil {
+		d.errorCh <- err
 	}
 }
