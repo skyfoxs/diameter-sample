@@ -38,12 +38,13 @@ func NewClient(address string) *DiameterClient {
 	return client
 }
 
-func (d *DiameterClient) Start() {
+func (d *DiameterClient) Start() error {
 	var err error
 	d.conn, err = diam.Dial(d.URL, d.handler, nil)
 	if err != nil {
-		d.errorCh <- err
+		return err
 	}
+	return nil
 }
 
 func (d *DiameterClient) SendCER() {

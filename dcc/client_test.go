@@ -40,7 +40,10 @@ func TestClientRequestCER(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.Address)
-	client.Start()
+	if err := client.Start(); err != nil {
+		t.Error(err)
+	}
+	
 	client.SendCER()
 
 	select {
