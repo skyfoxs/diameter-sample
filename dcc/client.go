@@ -2,6 +2,7 @@ package dcc
 
 import (
 	"net"
+	"time"
 
 	"github.com/fiorix/go-diameter/diam"
 	"github.com/fiorix/go-diameter/diam/avp"
@@ -18,9 +19,10 @@ type DiameterClient struct {
 	conn    diam.Conn
 	handler *diam.ServeMux
 
-	errorCh chan error
-	ceaCh   chan *diam.Message
-	dwaCh   chan *diam.Message
+	errorCh   chan error
+	ceaCh     chan *diam.Message
+	dwaCh     chan *diam.Message
+	dwAliveCh chan *diam.Message
 }
 
 type DiameterConfig struct {
@@ -30,6 +32,7 @@ type DiameterConfig struct {
 	VendorID         datatype.Unsigned32
 	ProductName      datatype.UTF8String
 	FirmwareRevision datatype.Unsigned32
+	WatchdogInterval time.Duration
 }
 
 func (d *DiameterClient) ErrorNotify() <-chan error {
@@ -44,13 +47,18 @@ func (d *DiameterClient) DWRDoneNotify() <-chan *diam.Message {
 	return d.dwaCh
 }
 
+func (d *DiameterClient) WatchdogAliveNotify() <-chan *diam.Message {
+	return d.dwAliveCh
+}
+
 func NewClient(config DiameterConfig) *DiameterClient {
 	client := &DiameterClient{
 		config: config,
 
-		errorCh: make(chan error),
-		ceaCh:   make(chan *diam.Message),
-		dwaCh:   make(chan *diam.Message),
+		errorCh:   make(chan error),
+		ceaCh:     make(chan *diam.Message),
+		dwaCh:     make(chan *diam.Message),
+		dwAliveCh: make(chan *diam.Message),
 	}
 	client.handler = diam.NewServeMux()
 	client.handler.Handle("CEA", client.HandleCEA())
@@ -72,7 +80,16 @@ func (d *DiameterClient) Init() {
 	d.SendCER()
 
 	<-d.CERDoneNotify()
-	d.SendDWR()
+	go d.LoopWatchdog()
+}
+
+func (d *DiameterClient) LoopWatchdog() {
+	for {
+		d.SendDWR()
+
+		d.dwAliveCh <- <-d.DWRDoneNotify()
+		time.Sleep(d.config.WatchdogInterval)
+	}
 }
 
 func (d *DiameterClient) SendCER() {

@@ -44,6 +44,7 @@ func NewTestClient(address string) *DiameterClient {
 		VendorID:         datatype.Unsigned32(0),
 		ProductName:      datatype.UTF8String("omr"),
 		FirmwareRevision: datatype.Unsigned32(1),
+		WatchdogInterval: 100 * time.Millisecond,
 	})
 }
 
@@ -120,7 +121,6 @@ func (s *Server) HandleDWR() diam.HandlerFunc {
 func (s *Server) SendDWA(w io.Writer, m *diam.Message) {
 	m.NewAVP(avp.OriginHost, avp.Mbit, 0, datatype.OctetString("srv"))
 	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, datatype.OctetString("localhost"))
-
 	_, err := m.WriteTo(w)
 	if err != nil {
 		s.errorCh <- err
@@ -146,5 +146,30 @@ func TestClientHandshakeAndRequestWatchdog(t *testing.T) {
 	case <-client.DWRDoneNotify():
 	case <-time.After(time.Second):
 		t.Error("timeout")
+	}
+}
+
+func TestBackgroundWatchdog(t *testing.T) {
+	server := NewTestServer()
+	defer server.Close()
+
+	client := NewTestClient(server.Address)
+	if err := client.Start(); err != nil {
+		t.Error(err)
+	}
+
+	go client.LoopWatchdog()
+
+	interval := 2
+	for i := 0; i < interval; i++ {
+		select {
+		case err := <-server.ErrorNotify():
+			t.Error(err)
+		case err := <-client.ErrorNotify():
+			t.Error(err)
+		case <-client.WatchdogAliveNotify():
+		case <-time.After(time.Second):
+			t.Error("timeout")
+		}
 	}
 }
