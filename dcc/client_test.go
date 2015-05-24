@@ -36,11 +36,22 @@ func NewTestServer() *Server {
 	return testServer
 }
 
+func NewTestClient(address string) *DiameterClient {
+	return NewClient(DiameterConfig{
+		URL:              address,
+		OriginHost:       datatype.DiameterIdentity("jenkin13_OMR_TEST01"),
+		OriginRealm:      datatype.DiameterIdentity("dtac.co.th"),
+		vendorID:         datatype.Unsigned32(0),
+		productName:      datatype.UTF8String("omr"),
+		FirmwareRevision: datatype.Unsigned32(1),
+	})
+}
+
 func TestClientRequestCER(t *testing.T) {
 	server := NewTestServer()
 	defer server.Close()
 
-	client := NewClient(server.Address)
+	client := NewTestClient(server.Address)
 	if err := client.Start(); err != nil {
 		t.Error(err)
 	}
@@ -80,7 +91,7 @@ func TestClientRequestDWR(t *testing.T) {
 	server := NewTestServer()
 	defer server.Close()
 
-	client := NewClient(server.Address)
+	client := NewTestClient(server.Address)
 	if err := client.Start(); err != nil {
 		t.Error(err)
 	}

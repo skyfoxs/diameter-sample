@@ -8,14 +8,28 @@ import (
 	"github.com/fiorix/go-diameter/diam/datatype"
 )
 
+var (
+	CapabilitiesExchange uint32 = 257
+	watchdogExchange     uint32 = 280
+)
+
 type DiameterClient struct {
-	URL     string
+	config  DiameterConfig
 	conn    diam.Conn
 	handler *diam.ServeMux
 
 	errorCh chan error
 	ceaCh   chan *diam.Message
 	dwaCh   chan *diam.Message
+}
+
+type DiameterConfig struct {
+	URL              string
+	OriginHost       datatype.DiameterIdentity
+	OriginRealm      datatype.DiameterIdentity
+	vendorID         datatype.Unsigned32
+	productName      datatype.UTF8String
+	FirmwareRevision datatype.Unsigned32
 }
 
 func (d *DiameterClient) ErrorNotify() <-chan error {
@@ -30,9 +44,9 @@ func (d *DiameterClient) DWRDoneNotify() <-chan *diam.Message {
 	return d.dwaCh
 }
 
-func NewClient(address string) *DiameterClient {
+func NewClient(config DiameterConfig) *DiameterClient {
 	client := &DiameterClient{
-		URL: address,
+		config: config,
 
 		errorCh: make(chan error),
 		ceaCh:   make(chan *diam.Message),
@@ -47,7 +61,7 @@ func NewClient(address string) *DiameterClient {
 
 func (d *DiameterClient) Start() error {
 	var err error
-	d.conn, err = diam.Dial(d.URL, d.handler, nil)
+	d.conn, err = diam.Dial(d.config.URL, d.handler, nil)
 	if err != nil {
 		return err
 	}
@@ -55,29 +69,20 @@ func (d *DiameterClient) Start() error {
 }
 
 func (d *DiameterClient) SendCER() {
-	var (
-		CapabilitiesExchange uint32 = 257
-		OriginHost                  = datatype.DiameterIdentity("jenkin13_OMR_TEST01")
-		OriginRealm                 = datatype.DiameterIdentity("dtac.co.th")
-		vendorID                    = datatype.Unsigned32(0)
-		productName                 = datatype.UTF8String("omr")
-		FirmwareRevision            = datatype.Unsigned32(1)
-	)
-
 	m := diam.NewRequest(CapabilitiesExchange, 0, nil)
 
-	m.NewAVP(avp.OriginHost, avp.Mbit, 0, OriginHost)
-	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, OriginRealm)
+	m.NewAVP(avp.OriginHost, avp.Mbit, 0, d.config.OriginHost)
+	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, d.config.OriginRealm)
 
 	ip, _, _ := net.SplitHostPort(d.conn.LocalAddr().String())
 	m.NewAVP(avp.HostIPAddress, avp.Mbit, 0, datatype.Address(net.ParseIP(ip)))
-	m.NewAVP(avp.VendorID, avp.Mbit, 0, vendorID)
-	m.NewAVP(avp.ProductName, 0, 0, productName)
+	m.NewAVP(avp.VendorID, avp.Mbit, 0, d.config.vendorID)
+	m.NewAVP(avp.ProductName, 0, 0, d.config.productName)
 	m.NewAVP(avp.OriginStateID, avp.Mbit, 0, datatype.Unsigned32(0))
 	m.NewAVP(avp.SupportedVendorID, avp.Mbit, 0, datatype.Unsigned32(0))
 	m.NewAVP(avp.AuthApplicationID, avp.Mbit, 0, datatype.Unsigned32(4))
 	m.NewAVP(avp.AcctApplicationID, avp.Mbit, 0, datatype.Unsigned32(4))
-	m.NewAVP(avp.FirmwareRevision, avp.Mbit, 0, FirmwareRevision)
+	m.NewAVP(avp.FirmwareRevision, avp.Mbit, 0, d.config.FirmwareRevision)
 
 	_, err := m.WriteTo(d.conn)
 	if err != nil {
@@ -92,16 +97,10 @@ func (d *DiameterClient) HandleCEA() diam.HandlerFunc {
 }
 
 func (d *DiameterClient) SendDWR() {
-	var (
-		watchdogExchange uint32 = 280
-		OriginHost              = datatype.DiameterIdentity("jenkin13_OMR_TEST01")
-		OriginRealm             = datatype.DiameterIdentity("dtac.co.th")
-	)
-
 	m := diam.NewRequest(watchdogExchange, 0, nil)
 
-	m.NewAVP(avp.OriginHost, avp.Mbit, 0, OriginHost)
-	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, OriginRealm)
+	m.NewAVP(avp.OriginHost, avp.Mbit, 0, d.config.OriginHost)
+	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, d.config.OriginRealm)
 
 	_, err := m.WriteTo(d.conn)
 	if err != nil {
