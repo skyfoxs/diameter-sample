@@ -41,8 +41,8 @@ func NewTestClient(address string) *DiameterClient {
 		URL:              address,
 		OriginHost:       datatype.DiameterIdentity("jenkin13_OMR_TEST01"),
 		OriginRealm:      datatype.DiameterIdentity("dtac.co.th"),
-		vendorID:         datatype.Unsigned32(0),
-		productName:      datatype.UTF8String("omr"),
+		VendorID:         datatype.Unsigned32(0),
+		ProductName:      datatype.UTF8String("omr"),
 		FirmwareRevision: datatype.Unsigned32(1),
 	})
 }

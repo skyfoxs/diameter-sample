@@ -27,8 +27,8 @@ type DiameterConfig struct {
 	URL              string
 	OriginHost       datatype.DiameterIdentity
 	OriginRealm      datatype.DiameterIdentity
-	vendorID         datatype.Unsigned32
-	productName      datatype.UTF8String
+	VendorID         datatype.Unsigned32
+	ProductName      datatype.UTF8String
 	FirmwareRevision datatype.Unsigned32
 }
 
@@ -76,8 +76,8 @@ func (d *DiameterClient) SendCER() {
 
 	ip, _, _ := net.SplitHostPort(d.conn.LocalAddr().String())
 	m.NewAVP(avp.HostIPAddress, avp.Mbit, 0, datatype.Address(net.ParseIP(ip)))
-	m.NewAVP(avp.VendorID, avp.Mbit, 0, d.config.vendorID)
-	m.NewAVP(avp.ProductName, 0, 0, d.config.productName)
+	m.NewAVP(avp.VendorID, avp.Mbit, 0, d.config.VendorID)
+	m.NewAVP(avp.ProductName, 0, 0, d.config.ProductName)
 	m.NewAVP(avp.OriginStateID, avp.Mbit, 0, datatype.Unsigned32(0))
 	m.NewAVP(avp.SupportedVendorID, avp.Mbit, 0, datatype.Unsigned32(0))
 	m.NewAVP(avp.AuthApplicationID, avp.Mbit, 0, datatype.Unsigned32(4))
