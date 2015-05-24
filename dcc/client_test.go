@@ -1,10 +1,10 @@
 package dcc
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/fiorix/go-diameter/diam"
 	"github.com/fiorix/go-diameter/diam/avp"
@@ -63,8 +63,9 @@ func TestClientRequestCER(t *testing.T) {
 		t.Error(err)
 	case err := <-client.ErrorNotify():
 		t.Error(err)
-	case m := <-client.CERDoneNotify():
-		fmt.Println(m)
+	case <-client.CERDoneNotify():
+	case <-time.After(time.Second):
+		t.Error("timeout")
 	}
 }
 
@@ -103,8 +104,9 @@ func TestClientRequestDWR(t *testing.T) {
 		t.Error(err)
 	case err := <-client.ErrorNotify():
 		t.Error(err)
-	case m := <-client.DWRDoneNotify():
-		fmt.Println(m)
+	case <-client.DWRDoneNotify():
+	case <-time.After(time.Second):
+		t.Error("timeout")
 	}
 }
 
@@ -122,5 +124,27 @@ func (s *Server) SendDWA(w io.Writer, m *diam.Message) {
 	_, err := m.WriteTo(w)
 	if err != nil {
 		s.errorCh <- err
+	}
+}
+
+func TestClientHandshakeAndRequestWatchdog(t *testing.T) {
+	server := NewTestServer()
+	defer server.Close()
+
+	client := NewTestClient(server.Address)
+	if err := client.Start(); err != nil {
+		t.Error(err)
+	}
+
+	client.Init()
+
+	select {
+	case err := <-server.ErrorNotify():
+		t.Error(err)
+	case err := <-client.ErrorNotify():
+		t.Error(err)
+	case <-client.DWRDoneNotify():
+	case <-time.After(time.Second):
+		t.Error("timeout")
 	}
 }

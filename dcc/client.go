@@ -68,6 +68,13 @@ func (d *DiameterClient) Start() error {
 	return nil
 }
 
+func (d *DiameterClient) Init() {
+	d.SendCER()
+
+	<-d.CERDoneNotify()
+	d.SendDWR()
+}
+
 func (d *DiameterClient) SendCER() {
 	m := diam.NewRequest(CapabilitiesExchange, 0, nil)
 
