@@ -10,11 +10,6 @@ import (
 	"github.com/fiorix/go-diameter/diam/datatype"
 )
 
-var (
-	CapabilitiesExchange uint32 = 257
-	watchdogExchange     uint32 = 280
-)
-
 type DiameterClient struct {
 	config  DiameterConfig
 	conn    diam.Conn
@@ -123,7 +118,7 @@ func (d *DiameterClient) HandleCEA() diam.HandlerFunc {
 }
 
 func (d *DiameterClient) SendDWR() {
-	m := diam.NewRequest(watchdogExchange, 0, nil)
+	m := diam.NewRequest(WatchdogExchange, 0, nil)
 
 	m.NewAVP(avp.OriginHost, avp.Mbit, 0, d.config.OriginHost)
 	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, d.config.OriginRealm)

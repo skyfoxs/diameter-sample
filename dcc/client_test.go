@@ -218,7 +218,7 @@ func TestServerCallDWR(t *testing.T) {
 }
 
 func (s *Server) SendDWR() {
-	m := diam.NewRequest(watchdogExchange, 0, nil)
+	m := diam.NewRequest(WatchdogExchange, 0, nil)
 
 	m.NewAVP(avp.OriginHost, avp.Mbit, 0, datatype.DiameterIdentity("srv"))
 	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, datatype.DiameterIdentity("localhost"))
