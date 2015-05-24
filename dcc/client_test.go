@@ -37,6 +37,7 @@ func NewTestServer() *Server {
 	smux.Handle("CER", testServer.HandleCER())
 	smux.Handle("DWR", testServer.HandleDWR())
 	smux.Handle("DWA", testServer.HandleDWA())
+	smux.Handle("CCR", testServer.HandleCCR())
 
 	testServer.Server = diamtest.NewServer(smux, nil)
 
@@ -46,10 +47,12 @@ func NewTestServer() *Server {
 func NewTestClient(address string) *DiameterClient {
 	return NewClient(DiameterConfig{
 		URL:              address,
-		OriginHost:       datatype.DiameterIdentity("jenkin13_OMR_TEST01"),
-		OriginRealm:      datatype.DiameterIdentity("dtac.co.th"),
+		OriginHost:       datatype.DiameterIdentity("client"),
+		OriginRealm:      datatype.DiameterIdentity("localhost"),
+		DestinationHost:  datatype.DiameterIdentity("srv"),
+		DestinationRealm: datatype.DiameterIdentity("localhost"),
 		VendorID:         datatype.Unsigned32(0),
-		ProductName:      datatype.UTF8String("omr"),
+		ProductName:      datatype.UTF8String("go-diameter"),
 		FirmwareRevision: datatype.Unsigned32(1),
 		WatchdogInterval: 100 * time.Millisecond,
 	})
@@ -218,7 +221,7 @@ func TestServerCallDWR(t *testing.T) {
 }
 
 func (s *Server) SendDWR() {
-	m := diam.NewRequest(WatchdogExchange, 0, nil)
+	m := diam.NewRequest(diam.DeviceWatchdog, 0, nil)
 
 	m.NewAVP(avp.OriginHost, avp.Mbit, 0, datatype.DiameterIdentity("srv"))
 	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, datatype.DiameterIdentity("localhost"))
@@ -234,4 +237,95 @@ func (s *Server) HandleDWA() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
 		s.dwaCh <- m
 	}
+}
+
+func TestClientCallCCR(t *testing.T) {
+	server := NewTestServer()
+	defer server.Close()
+
+	client := NewTestClient(server.Address)
+	if err := client.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	client.SendCCR([]*diam.AVP{})
+
+	select {
+	case err := <-server.ErrorNotify():
+		t.Error(err)
+	case err := <-client.ErrorNotify():
+		t.Error(err)
+	case <-client.CCRDoneNotify():
+	case <-time.After(time.Second):
+		t.Error("server timeout")
+	}
+}
+
+func (s *Server) HandleCCR() diam.HandlerFunc {
+	return func(conn diam.Conn, m *diam.Message) {
+		s.conn = conn
+		answerMessage := m.Answer(diam.Success)
+		s.SendCCA(answerMessage)
+	}
+}
+
+func (s *Server) SendCCA(m *diam.Message) {
+	m.NewAVP(avp.OriginHost, avp.Mbit, 0, datatype.DiameterIdentity("srv"))
+	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, datatype.DiameterIdentity("localhost"))
+
+	_, err := m.WriteTo(s.conn)
+	if err != nil {
+		s.errorCh <- err
+	}
+}
+
+func TestClientRunBackgroundCCR(t *testing.T) {
+	server := NewTestServer()
+	defer server.Close()
+
+	client := NewTestClient(server.Address)
+	if err := client.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	go client.Listen()
+
+	request := &mockRequest{
+		outCh: make(chan *diam.Message),
+	}
+	anotherRequest := &mockRequest{
+		outCh: make(chan *diam.Message),
+	}
+	client.Serve(request)
+	client.Serve(anotherRequest)
+
+	interval := 2
+	for i := 0; i < interval; i++ {
+		select {
+		case err := <-server.ErrorNotify():
+			t.Error(err)
+		case err := <-client.ErrorNotify():
+			t.Error(err)
+		case <-request.ResponseNotify():
+		case <-anotherRequest.ResponseNotify():
+		case <-time.After(time.Second):
+			t.Error("server timeout")
+		}
+	}
+}
+
+type mockRequest struct {
+	outCh chan *diam.Message
+}
+
+func (r *mockRequest) Response(m *diam.Message) {
+	r.outCh <- m
+}
+
+func (r *mockRequest) ResponseNotify() <-chan *diam.Message {
+	return r.outCh
+}
+
+func (r *mockRequest) AVP() []*diam.AVP {
+	return []*diam.AVP{}
 }
