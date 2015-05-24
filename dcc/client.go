@@ -90,6 +90,7 @@ func (d *DiameterClient) Init() {
 
 	<-d.CERDoneNotify()
 	go d.LoopWatchdog()
+	go d.Listen()
 }
 
 func (d *DiameterClient) LoopWatchdog() {

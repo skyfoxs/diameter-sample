@@ -288,7 +288,7 @@ func TestClientRunBackgroundCCR(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	go client.Listen()
+	client.Init()
 
 	request := &mockRequest{
 		outCh: make(chan *diam.Message),
