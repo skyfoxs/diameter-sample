@@ -11,7 +11,7 @@ import (
 	"github.com/fiorix/go-diameter/diam/datatype"
 )
 
-type DiameterClient struct {
+type diameterClient struct {
 	config  DiameterConfig
 	conn    diam.Conn
 	handler *diam.ServeMux
@@ -36,32 +36,32 @@ type DiameterConfig struct {
 	WatchdogInterval time.Duration
 }
 
-func (d *DiameterClient) ErrorNotify() <-chan error {
+func (d *diameterClient) ErrorNotify() <-chan error {
 	return d.errorCh
 }
 
-func (d *DiameterClient) CERDoneNotify() <-chan *diam.Message {
+func (d *diameterClient) cerDoneNotify() <-chan *diam.Message {
 	return d.ceaCh
 }
 
-func (d *DiameterClient) DWRDoneNotify() <-chan *diam.Message {
+func (d *diameterClient) dwrDoneNotify() <-chan *diam.Message {
 	return d.dwaCh
 }
 
-func (d *DiameterClient) WatchdogAliveNotify() <-chan *diam.Message {
+func (d *diameterClient) watchdogAliveNotify() <-chan *diam.Message {
 	return d.dwAliveCh
 }
 
-func (d *DiameterClient) CCRDoneNotify() <-chan *diam.Message {
+func (d *diameterClient) ccrDoneNotify() <-chan *diam.Message {
 	return d.ccaCh
 }
 
-func (d *DiameterClient) Close() {
+func (d *diameterClient) Close() {
 	d.conn.Close()
 }
 
-func NewClient(config DiameterConfig) *DiameterClient {
-	client := &DiameterClient{
+func NewClient(config DiameterConfig) *diameterClient {
+	client := &diameterClient{
 		config: config,
 
 		errorCh:   make(chan error),
@@ -72,15 +72,15 @@ func NewClient(config DiameterConfig) *DiameterClient {
 		inCh:      make(chan Request, 10),
 	}
 	client.handler = diam.NewServeMux()
-	client.handler.Handle("CEA", client.HandleCEA())
-	client.handler.Handle("DWA", client.HandleDWA())
-	client.handler.Handle("DWR", client.HandleDWR())
-	client.handler.Handle("CCA", client.HandleCCA())
+	client.handler.Handle("CEA", client.handleCEA())
+	client.handler.Handle("DWA", client.handleDWA())
+	client.handler.Handle("DWR", client.handleDWR())
+	client.handler.Handle("CCA", client.handleCCA())
 
 	return client
 }
 
-func (d *DiameterClient) Start() error {
+func (d *diameterClient) Start() error {
 	var err error
 	d.conn, err = diam.Dial(d.config.URL, d.handler, nil)
 	if err != nil {
@@ -89,19 +89,19 @@ func (d *DiameterClient) Start() error {
 	return nil
 }
 
-func (d *DiameterClient) Init() {
-	d.SendCER()
+func (d *diameterClient) Init() {
+	d.sendCER()
 
-	<-d.CERDoneNotify()
-	go d.LoopWatchdog()
-	go d.Listen()
+	<-d.cerDoneNotify()
+	go d.loopWatchdog()
+	go d.listen()
 }
 
-func (d *DiameterClient) LoopWatchdog() {
+func (d *diameterClient) loopWatchdog() {
 	for {
-		d.SendDWR()
+		d.sendDWR()
 
-		d.dwAliveCh <- <-d.DWRDoneNotify()
+		d.dwAliveCh <- <-d.dwrDoneNotify()
 		time.Sleep(d.config.WatchdogInterval)
 	}
 }
@@ -112,19 +112,19 @@ type Request interface {
 	Response(*diam.Message)
 }
 
-func (d *DiameterClient) Listen() {
+func (d *diameterClient) listen() {
 	for {
 		request := <-d.inCh
-		d.SendCCR(request.AVP())
-		request.Response(<-d.CCRDoneNotify())
+		d.sendCCR(request.AVP())
+		request.Response(<-d.ccrDoneNotify())
 	}
 }
 
-func (d *DiameterClient) Serve(request Request) {
+func (d *diameterClient) Serve(request Request) {
 	d.inCh <- request
 }
 
-func (d *DiameterClient) SendCER() {
+func (d *diameterClient) sendCER() {
 	m := diam.NewRequest(diam.CapabilitiesExchange, 0, nil)
 
 	m.NewAVP(avp.OriginHost, avp.Mbit, 0, d.config.OriginHost)
@@ -146,13 +146,13 @@ func (d *DiameterClient) SendCER() {
 	}
 }
 
-func (d *DiameterClient) HandleCEA() diam.HandlerFunc {
+func (d *diameterClient) handleCEA() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
 		d.ceaCh <- m
 	}
 }
 
-func (d *DiameterClient) SendDWR() {
+func (d *diameterClient) sendDWR() {
 	m := diam.NewRequest(diam.DeviceWatchdog, 0, nil)
 
 	m.NewAVP(avp.OriginHost, avp.Mbit, 0, d.config.OriginHost)
@@ -164,20 +164,20 @@ func (d *DiameterClient) SendDWR() {
 	}
 }
 
-func (d *DiameterClient) HandleDWA() diam.HandlerFunc {
+func (d *diameterClient) handleDWA() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
 		d.dwaCh <- m
 	}
 }
 
-func (d *DiameterClient) HandleDWR() diam.HandlerFunc {
+func (d *diameterClient) handleDWR() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
 		answerMessage := m.Answer(diam.Success)
-		d.SendDWA(conn, answerMessage)
+		d.sendDWA(conn, answerMessage)
 	}
 }
 
-func (d *DiameterClient) SendDWA(w io.Writer, m *diam.Message) {
+func (d *diameterClient) sendDWA(w io.Writer, m *diam.Message) {
 	m.NewAVP(avp.OriginHost, avp.Mbit, 0, d.config.OriginHost)
 	m.NewAVP(avp.OriginRealm, avp.Mbit, 0, d.config.OriginRealm)
 	_, err := m.WriteTo(w)
@@ -187,7 +187,7 @@ func (d *DiameterClient) SendDWA(w io.Writer, m *diam.Message) {
 	}
 }
 
-func (d *DiameterClient) SendCCR(avps []*diam.AVP) {
+func (d *diameterClient) sendCCR(avps []*diam.AVP) {
 	sessionID := fmt.Sprintf("dtac.co.th;OMR%s001", time.Now().Format("20060102150405000"))
 
 	m := diam.NewRequest(diam.CreditControl, 4, nil)
@@ -207,7 +207,7 @@ func (d *DiameterClient) SendCCR(avps []*diam.AVP) {
 	}
 }
 
-func (d *DiameterClient) HandleCCA() diam.HandlerFunc {
+func (d *diameterClient) handleCCA() diam.HandlerFunc {
 	return func(conn diam.Conn, m *diam.Message) {
 		d.ccaCh <- m
 	}

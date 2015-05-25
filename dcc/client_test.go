@@ -44,7 +44,7 @@ func NewTestServer() *Server {
 	return testServer
 }
 
-func NewTestClient(address string) *DiameterClient {
+func NewTestClient(address string) *diameterClient {
 	return NewClient(DiameterConfig{
 		URL:              address,
 		OriginHost:       datatype.DiameterIdentity("client"),
@@ -68,14 +68,14 @@ func TestClientRequestCER(t *testing.T) {
 	}
 	defer client.Close()
 
-	client.SendCER()
+	client.sendCER()
 
 	select {
 	case err := <-server.ErrorNotify():
 		t.Error(err)
 	case err := <-client.ErrorNotify():
 		t.Error(err)
-	case <-client.CERDoneNotify():
+	case <-client.cerDoneNotify():
 	case <-time.After(time.Second):
 		t.Error("timeout")
 	}
@@ -111,14 +111,14 @@ func TestClientRequestDWR(t *testing.T) {
 	}
 	defer client.Close()
 
-	client.SendDWR()
+	client.sendDWR()
 
 	select {
 	case err := <-server.ErrorNotify():
 		t.Error(err)
 	case err := <-client.ErrorNotify():
 		t.Error(err)
-	case <-client.DWRDoneNotify():
+	case <-client.dwrDoneNotify():
 	case <-time.After(time.Second):
 		t.Error("timeout")
 	}
@@ -158,7 +158,7 @@ func TestClientHandshakeAndRequestWatchdog(t *testing.T) {
 		t.Error(err)
 	case err := <-client.ErrorNotify():
 		t.Error(err)
-	case <-client.DWRDoneNotify():
+	case <-client.dwrDoneNotify():
 	case <-time.After(time.Second):
 		t.Error("timeout")
 	}
@@ -174,7 +174,7 @@ func TestBackgroundWatchdog(t *testing.T) {
 	}
 	defer client.Close()
 
-	go client.LoopWatchdog()
+	go client.loopWatchdog()
 
 	interval := 2
 	for i := 0; i < interval; i++ {
@@ -183,7 +183,7 @@ func TestBackgroundWatchdog(t *testing.T) {
 			t.Error(err)
 		case err := <-client.ErrorNotify():
 			t.Error(err)
-		case <-client.WatchdogAliveNotify():
+		case <-client.watchdogAliveNotify():
 		case <-time.After(time.Second):
 			t.Error("timeout")
 		}
@@ -200,14 +200,14 @@ func TestServerCallDWR(t *testing.T) {
 	}
 	defer client.Close()
 
-	client.SendCER()
+	client.sendCER()
 
 	select {
 	case err := <-server.ErrorNotify():
 		t.Fatal(err)
 	case err := <-client.ErrorNotify():
 		t.Fatal(err)
-	case <-client.CERDoneNotify():
+	case <-client.cerDoneNotify():
 	case <-time.After(time.Second):
 		t.Fatal("client timeout")
 	}
@@ -254,14 +254,14 @@ func TestClientCallCCR(t *testing.T) {
 	}
 	defer client.Close()
 
-	client.SendCCR([]*diam.AVP{})
+	client.sendCCR([]*diam.AVP{})
 
 	select {
 	case err := <-server.ErrorNotify():
 		t.Error(err)
 	case err := <-client.ErrorNotify():
 		t.Error(err)
-	case <-client.CCRDoneNotify():
+	case <-client.ccrDoneNotify():
 	case <-time.After(time.Second):
 		t.Error("server timeout")
 	}
