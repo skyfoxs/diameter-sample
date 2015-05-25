@@ -66,6 +66,7 @@ func TestClientRequestCER(t *testing.T) {
 	if err := client.Start(); err != nil {
 		t.Error(err)
 	}
+	defer client.Close()
 
 	client.SendCER()
 
@@ -108,6 +109,7 @@ func TestClientRequestDWR(t *testing.T) {
 	if err := client.Start(); err != nil {
 		t.Error(err)
 	}
+	defer client.Close()
 
 	client.SendDWR()
 
@@ -147,6 +149,7 @@ func TestClientHandshakeAndRequestWatchdog(t *testing.T) {
 	if err := client.Start(); err != nil {
 		t.Error(err)
 	}
+	defer client.Close()
 
 	client.Init()
 
@@ -169,6 +172,7 @@ func TestBackgroundWatchdog(t *testing.T) {
 	if err := client.Start(); err != nil {
 		t.Error(err)
 	}
+	defer client.Close()
 
 	go client.LoopWatchdog()
 
@@ -194,6 +198,7 @@ func TestServerCallDWR(t *testing.T) {
 	if err := client.Start(); err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	client.SendCER()
 
@@ -247,6 +252,7 @@ func TestClientCallCCR(t *testing.T) {
 	if err := client.Start(); err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	client.SendCCR([]*diam.AVP{})
 
@@ -287,6 +293,7 @@ func TestClientRunBackgroundCCR(t *testing.T) {
 	if err := client.Start(); err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	client.Init()
 

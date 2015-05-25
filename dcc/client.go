@@ -56,6 +56,10 @@ func (d *DiameterClient) CCRDoneNotify() <-chan *diam.Message {
 	return d.ccaCh
 }
 
+func (d *DiameterClient) Close() {
+	d.conn.Close()
+}
+
 func NewClient(config DiameterConfig) *DiameterClient {
 	client := &DiameterClient{
 		config: config,
